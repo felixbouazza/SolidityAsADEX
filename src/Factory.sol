@@ -11,10 +11,11 @@ contract Factory is IFactory {
         return pairs[token0][token1];
     }
     function createPair(address token0, address token1) external returns (address) {
-        Pair pair = new Pair(token0, token1);
+        Pair pair = new Pair(address(this), token0, token1);
         address pairAddress = address(pair);
         pairs[token0][token1] = pairAddress;
         pairs[token1][token0] = pairAddress;
+        emit PairCreated(token0, token1, pairAddress);
         return pairAddress;
     }
 }
