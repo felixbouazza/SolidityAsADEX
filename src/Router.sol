@@ -53,8 +53,33 @@ contract Router is IRouter {
         bool successTransferLiquidity = IERC20(pair).transferFrom(msg.sender, pair, liquidity);
         require(successTransferLiquidity, "Transfer from error when trying to transfer liquidity");
 
-        (uint amountToken0, uint amountToken1) = IPair(pair).mint(to);
+        (uint amountToken0, uint amountToken1) = IPair(pair).burn(to);
         return (amountToken0, amountToken1);
+    }
+
+    function swapTokenforToken(address token0, address token1, uint amount0In, uint amount1In, address to) external returns (uint) {
+        require(token0 != address(0) && token1 != address(0), "Zero address");
+        require(token0 != address(this) && token1 != address(this), "Invalid address");
+        require(token0 != factory && token1 != factory, "Invalid address");
+        require(amount0In == 0 || amount1In == 0, "Invalid amount");
+
+        (token0, amount0In, token1, amount1In) = token0 < token1 ? (token0, amount0In, token1, amount1In) : (token1, amount1In, token0, amount0In);
+
+        Factory factoryContract = Factory(factory);
+        address pair = factoryContract.getPair(token0, token1);
+        require(pair != address(0), "Pair not found");
+
+        bool successTransfer;
+
+        if(amount0In > 0) {
+            successTransfer = IERC20(token0).transferFrom(msg.sender, pair, amount0In);
+        } else {
+            successTransfer = IERC20(token1).transferFrom(msg.sender, pair, amount1In);
+        }
+
+        require(successTransfer, "Transfer from error when trying to transfer token");
+
+        return IPair(pair).swap(to);
     }
 
 }
