@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import "./interfaces/IPair.sol";
-import "./interfaces/IERC20.sol";
-import "./ERC20.sol";
+import "./MintableERC20.sol";
 import "./Math.sol";
 
-contract Pair is IPair, ERC20, Math {
+contract Pair is MintableERC20, Math {
 
     uint constant MINIMUM_LIQUIDITY = 10**3;
 

@@ -3,31 +3,44 @@ pragma solidity ^0.8.28;
 
 import "./interfaces/IERC20.sol";
 
-// contract ERC20 is IERC20 {
-contract ERC20 {
+contract ERC20 is IERC20 {
 
+    event Approval(address indexed owner, address indexed spender, uint value);
+    event Transfer(address indexed from, address indexed to, uint value);
+
+    string public immutable name;
+    string public immutable symbol;
+    uint public immutable decimals; 
     uint public totalSupply;
     mapping(address => uint) public balanceOf;
+    mapping(address => mapping(address => uint)) public allowance;
 
-    function _mint(address to, uint value) internal {
-        totalSupply = totalSupply + value;
-        balanceOf[to] = balanceOf[to] + value;
+    constructor(string memory _name, string memory _symbol, uint _decimals) {
+        name = _name;
+        symbol = _symbol;
+        decimals = _decimals;
     }
 
-    function _burn(address to, uint value) internal {
-        balanceOf[to] = balanceOf[to] - value;
-        totalSupply = totalSupply - value;
+    function approve(address spender, uint value) external returns (bool) {
+        allowance[msg.sender][spender] = value;
+        emit Approval(msg.sender, spender, value);
+        return true;
     }
 
-    // function name() external view returns (string memory);
-    // function symbol() external view returns (string memory);
-    // function decimals() external view returns (uint8);
-    // function totalSupply() external view returns (uint);
-    // function balanceOf(address owner) external view returns (uint);
-    // function allowance(address owner, address spender) external view returns (uint);
-
-    // function approve(address spender, uint value) external returns (bool);
-    // function transfer(address to, uint value) external returns (bool);
-    // function transferFrom(address from, address to, uint value) external returns (bool);
+    function transfer(address to, uint value) external returns (bool) {
+        balanceOf[msg.sender] -= value;
+        balanceOf[to] += value;
+        emit Transfer(msg.sender, to, value);
+        return true;
+    }
+    
+    function transferFrom(address from, address to, uint value) external returns (bool) {
+        require(allowance[from][msg.sender] >= value, "ERC20: Insufficient allowance");
+        balanceOf[from] -= value;
+        balanceOf[to] += value;
+        allowance[from][msg.sender] -= value;
+        emit Transfer(from, to, value);
+        return true;
+    }
 
 }
