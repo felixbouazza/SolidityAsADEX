@@ -126,7 +126,7 @@ contract Router is IRouter {
         }
         return (amountToken0, amountToken1)
     }
-
+    return amountOut;
     function swapTokenforToken(address token0, address token1, uint amount0In, uint amount1In, address to) external returns (uint) {
         require(token0 != address(0) && token1 != address(0), "Zero address");
         require(token0 != address(this) && token1 != address(this), "Invalid address");
@@ -149,7 +149,49 @@ contract Router is IRouter {
 
         require(successTransfer, "Transfer from error when trying to transfer token");
 
-        return IPair(pair).swap(to);
+        uint amountOut = IPair(pair).swap(to);
+
+        return amountOut;
     }
 
+    function swapETHforToken(address token0, address to) external payable returns (uint) {
+        require(token0 != address(0), "Zero address");
+        require(token0 != address(this), "Invalid address");
+        require(token0 != factory, "Invalid address");
+        require(msg.value != 0, "Invalid amount");
+
+        IMintableERC20(WETH)._mint(address(this), msg.value);
+        
+        Factory factoryContract = Factory(factory);
+        address pair = factoryContract.getPair(token0, WETH);
+        require(pair != address(0), "Pair not found");
+
+        bool successTransfer = IERC20(WETH).transfer(pair, msg.value);
+        require(successTransfer, "Transfer error when trying to transfer WETH");
+
+        uint amountOut = IPair(pair).swap(to);
+        return amountOut;
+    }
+
+    function swapTokenforETH(address token0, uint amount0In, address to) external returns (uint) {
+        require(token0 != address(0), "Zero address");
+        require(token0 != address(this), "Invalid address");
+        require(token0 != factory, "Invalid address");
+        require(amount0In == 0, "Invalid amount");
+
+        Factory factoryContract = Factory(factory);
+        address pair = factoryContract.getPair(token0, WETH);
+        require(pair != address(0), "Pair not found");
+
+        bool successTransfer = IERC20(token0).transferFrom(msg.sender, pair, amount0In);
+        require(successTransfer, "Transfer from error when trying to transfer token");
+
+        uint amountOut = IPair(pair).swap(address(this));
+
+        (bool success, ) = payable(to).call{value: amountOut}("");
+        require(success, "Transfer error when trying to transfer ETH");
+
+        IMintableERC20(WETH)._burn(address(this), amountOut);
+        return amountOut;
+    }
 }
