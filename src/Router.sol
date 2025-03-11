@@ -10,10 +10,34 @@ contract Router is IRouter {
 
     address public immutable factory;
     address public immutable WETH;
+    address public creator;
+    address public uniswapRouter;
+    uint public constant forwardToUniswapFee = 3;
 
-    constructor(address _factory, address _WETH) {
+
+    constructor(address _factory, address _WETH, address _creator, address _uniswapRouter) {
         factory = _factory;
         WETH = _WETH;
+        creator = _creator;
+        uniswapRouter = _uniswapRouter;
+    }
+
+    modifier onlyCreator() {
+        require(msg.sender == creator, "Only creator access");
+        _;
+    }
+
+    function setUniswapRouter(address _uniswapRouter) external onlyCreator {
+        uniswapRouter = _uniswapRouter;
+    }
+
+    function setCreator(address _creator) external onlyCreator {
+        creator = _creator;
+    }
+
+    function withdrawFeeForToken(address token, address to, uint value) external onlyCreator {
+        transferSuccess = IERC20(token).transfer(to, value);
+        require(transferSuccess, "Error when trying to withdraw fees")
     }
 
     function addLiquidity(address token0, address token1, uint amount0, uint amount1, address to) external returns (uint) {
@@ -126,7 +150,7 @@ contract Router is IRouter {
         }
         return (amountToken0, amountToken1)
     }
-    return amountOut;
+
     function swapTokenforToken(address token0, address token1, uint amount0In, uint amount1In, address to) external returns (uint) {
         require(token0 != address(0) && token1 != address(0), "Zero address");
         require(token0 != address(this) && token1 != address(this), "Invalid address");
@@ -135,17 +159,31 @@ contract Router is IRouter {
 
         (token0, amount0In, token1, amount1In) = token0 < token1 ? (token0, amount0In, token1, amount1In) : (token1, amount1In, token0, amount0In);
 
+        (amountIn, tokenIn) = amount0In > 0 ? (amount0In, token0) : (amount1In, token1)
+
         Factory factoryContract = Factory(factory);
         address pair = factoryContract.getPair(token0, token1);
-        require(pair != address(0), "Pair not found");
-
+        
         bool successTransfer;
 
-        if(amount0In > 0) {
-            successTransfer = IERC20(token0).transferFrom(msg.sender, pair, amount0In);
-        } else {
-            successTransfer = IERC20(token1).transferFrom(msg.sender, pair, amount1In);
+        if(pair == address(0)) {
+            successTransfer = IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+            require(successTransfer, "Transfer from error when trying to transfer token");
+            uint fee = (amountIn * forwardToUniswapFee) / 100;
+            uint transferAmount = amountIn - fee;
+            bool approve = IERC20(tokenIn).approve(uniswapRouter, transferAmount);
+            require(approve, "Error when trying to approve token");
+            (bool success, bytes memory data) = uniswapRouter.call{
+                value: msg.value,
+                gas: 5000
+            }(abi.encodeWithSignature(
+                "swapExactTokensForTokens(uint,uint,address[],address,uint)",
+                "call foo",
+                123
+            ));
         }
+
+        successTransfer = IERC20(tokenIn).transferFrom(msg.sender, pair, amountIn);
 
         require(successTransfer, "Transfer from error when trying to transfer token");
 
@@ -164,6 +202,7 @@ contract Router is IRouter {
         
         Factory factoryContract = Factory(factory);
         address pair = factoryContract.getPair(token0, WETH);
+
         require(pair != address(0), "Pair not found");
 
         bool successTransfer = IERC20(WETH).transfer(pair, msg.value);
